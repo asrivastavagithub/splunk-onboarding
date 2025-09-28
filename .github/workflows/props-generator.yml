@@ -4,6 +4,9 @@ on:
   push:
     paths:
       - "logs/**"
+      
+permissions:
+  contents: write
 
 jobs:
   generate-props:
