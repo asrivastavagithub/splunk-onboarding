@@ -1,0 +1,44 @@
+name: Generate props.conf from log sample
+
+on:
+  push:
+    paths:
+      - "logs/**"
+
+jobs:
+  generate-props:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Extract sample log
+        id: sample
+        run: |
+          # Take first 10 lines of the log as sample
+          head -n 10 logs/*.log > sample.log
+
+      - name: Call ChatGPT for props.conf suggestion
+        id: chatgpt
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          SAMPLE=$(cat sample.log)
+          RESPONSE=$(curl -s https://api.openai.com/v1/chat/completions \
+            -H "Authorization: Bearer $OPENAI_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "model": "gpt-5",
+              "messages": [
+                {"role": "system", "content": "You are a Splunk props.conf expert."},
+                {"role": "user", "content": "Given this log sample, suggest a props.conf stanza: ```'$SAMPLE'```"}
+              ]
+            }' | jq -r '.choices[0].message.content')
+          echo "$RESPONSE" > props.conf.suggestion
+
+      - name: Commit props.conf suggestion
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Generated props.conf suggestion"
+          file_pattern: props.conf.suggestion
